@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gungil.dev/schemas/rule.json",
+  "title": "Gungil Parsing Rule",
+  "description": "Schema for hospital/doctor data parsing rules",
+  "type": "object",
+  "required": ["site", "targets"],
+  "properties": {
+    "site": {
+      "type": "object",
+      "description": "Site identification and metadata",
+      "required": ["id", "name", "base_url"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique site identifier",
+          "minLength": 1,
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the site",
+          "minLength": 1
+        },
+        "base_url": {
+          "type": "string",
+          "description": "Base URL of the site",
+          "format": "uri"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the site is enabled for crawling",
+          "default": true
+        }
+      }
+    },
+    "crawler": {
+      "type": "object",
+      "description": "Crawler configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Crawler type",
+          "enum": ["http", "browser"],
+          "default": "http"
+        },
+        "rate_limit": {
+          "type": "number",
+          "description": "Requests per second",
+          "minimum": 0.1,
+          "maximum": 10,
+          "default": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Request timeout in seconds",
+          "minimum": 5,
+          "maximum": 120,
+          "default": 30
+        },
+        "headers": {
+          "type": "object",
+          "description": "Custom HTTP headers",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cookies": {
+          "type": "object",
+          "description": "Cookies to include in requests",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "description": "Crawl targets",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "url_pattern", "selectors"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Target name/identifier",
+            "minLength": 1
+          },
+          "url_pattern": {
+            "type": "string",
+            "description": "URL pattern with placeholders"
+          },
+          "requires_browser": {
+            "type": "boolean",
+            "description": "Whether this target requires browser rendering",
+            "default": false
+          },
+          "pagination": {
+            "type": "object",
+            "description": "Pagination configuration",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["page_param", "next_button", "infinite_scroll"]
+              },
+              "param": {
+                "type": "string",
+                "description": "Query parameter name for page number"
+              },
+              "selector": {
+                "type": "string",
+                "description": "CSS selector for next button"
+              },
+              "max_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 10
+              },
+              "start_page": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 1
+              }
+            }
+          },
+          "selectors": {
+            "type": "object",
+            "description": "Selector configuration",
+            "properties": {
+              "container": {
+                "type": "string",
+                "description": "CSS selector for container element"
+              },
+              "item": {
+                "type": "string",
+                "description": "CSS selector for individual items"
+              },
+              "fields": {
+                "type": "object",
+                "description": "Field extraction rules",
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "Simple CSS selector"
+                    },
+                    {
+                      "type": "object",
+                      "required": ["selector"],
+                      "properties": {
+                        "selector": {
+                          "type": "string",
+                          "description": "CSS selector or XPath"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": ["text", "text_list", "url", "attribute", "html"],
+                          "default": "text"
+                        },
+                        "attribute": {
+                          "type": "string",
+                          "description": "Attribute name to extract"
+                        },
+                        "default": {
+                          "description": "Default value if not found"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "transforms": {
+      "type": "array",
+      "description": "Post-processing transforms",
+      "items": {
+        "type": "object",
+        "required": ["field", "operations"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Field name to transform"
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "strip",
+                    "regex_extract",
+                    "regex_replace",
+                    "split",
+                    "join",
+                    "lowercase",
+                    "uppercase",
+                    "prefix",
+                    "suffix"
+                  ]
+                },
+                "pattern": {
+                  "type": "string",
+                  "description": "Regex pattern"
+                },
+                "replacement": {
+                  "type": "string",
+                  "description": "Replacement string"
+                },
+                "separator": {
+                  "type": "string",
+                  "description": "Separator for split/join"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Value for prefix/suffix"
+                },
+                "group": {
+                  "type": "integer",
+                  "description": "Regex group number",
+                  "minimum": 0,
+                  "default": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

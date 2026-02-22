@@ -1,0 +1,99 @@
+# Sample hospital parsing rule
+# This is a template for creating rules for hospital websites
+
+site:
+  id: "sample_hospital"
+  name: "샘플 병원"
+  base_url: "https://www.sample-hospital.co.kr"
+  enabled: false  # Disabled by default (template)
+
+crawler:
+  type: "http"  # Use "browser" for JS-rendered pages
+  rate_limit: 2  # Requests per second
+  timeout: 30  # Timeout in seconds
+  headers:
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    Accept-Language: "ko-KR,ko;q=0.9,en;q=0.8"
+
+targets:
+  # Doctor list page
+  - name: "doctor_list"
+    url_pattern: "/doctor/list?dept={dept_id}"
+    pagination:
+      type: "page_param"
+      param: "page"
+      max_pages: 10
+      start_page: 1
+
+    selectors:
+      container: "div.doctor-list"
+      item: "div.doctor-item"
+      fields:
+        name:
+          selector: "h3.name"
+          type: "text"
+        specialty:
+          selector: "span.specialty"
+          type: "text"
+        department:
+          selector: "span.department"
+          type: "text"
+        photo_url:
+          selector: "img.doctor-photo"
+          type: "url"
+          attribute: "src"
+        profile_url:
+          selector: "a.profile-link"
+          type: "url"
+          attribute: "href"
+
+  # Doctor detail page
+  - name: "doctor_detail"
+    url_pattern: "/doctor/{doctor_id}"
+    requires_browser: false
+
+    selectors:
+      fields:
+        name:
+          selector: "h1.doctor-name"
+          type: "text"
+        photo_url:
+          selector: "img.doctor-photo"
+          type: "url"
+          attribute: "src"
+        department:
+          selector: "div.department"
+          type: "text"
+        specialty:
+          selector: "ul.specialty li"
+          type: "text_list"
+        education:
+          selector: "ul.education li"
+          type: "text_list"
+        career:
+          selector: "ul.career li"
+          type: "text_list"
+        certifications:
+          selector: "ul.certifications li"
+          type: "text_list"
+        consultation_hours:
+          selector: "div.schedule"
+          type: "text"
+        phone:
+          selector: "span.phone"
+          type: "text"
+
+# Post-processing transforms
+transforms:
+  - field: "name"
+    operations:
+      - type: "strip"
+      - type: "regex_extract"
+        pattern: "^(.+?)\\s*(교수|과장|원장)?$"
+        group: 1
+
+  - field: "phone"
+    operations:
+      - type: "regex_replace"
+        pattern: "[^0-9-]"
+        replacement: ""

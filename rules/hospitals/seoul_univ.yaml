@@ -1,0 +1,128 @@
+# Seoul National University Hospital parsing rule
+# 서울대학교병원 의사 정보 수집 규칙
+
+site:
+  id: "seoul_univ"
+  name: "서울대학교병원"
+  base_url: "https://www.snuh.org"
+  enabled: true
+
+crawler:
+  type: "http"
+  rate_limit: 1  # Conservative rate limit
+  timeout: 30
+  headers:
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    Accept-Language: "ko-KR,ko;q=0.9,en;q=0.8"
+    Referer: "https://www.snuh.org"
+
+targets:
+  # Department doctor list
+  - name: "doctor_list"
+    url_pattern: "/medical/department/{dept_code}/doctors"
+    pagination:
+      type: "page_param"
+      param: "pageNo"
+      max_pages: 5
+      start_page: 1
+
+    selectors:
+      container: "div.doctor-list-wrap"
+      item: "div.doctor-card"
+      fields:
+        name:
+          selector: "span.name"
+          type: "text"
+        position:
+          selector: "span.position"
+          type: "text"
+        department:
+          selector: "span.dept-name"
+          type: "text"
+        specialty_text:
+          selector: "p.specialty"
+          type: "text"
+        photo_url:
+          selector: "img.doctor-img"
+          type: "url"
+          attribute: "src"
+        profile_url:
+          selector: "a.btn-detail"
+          type: "url"
+          attribute: "href"
+        doctor_id:
+          selector: "a.btn-detail"
+          type: "attribute"
+          attribute: "data-doctor-id"
+
+  # Doctor detail page
+  - name: "doctor_detail"
+    url_pattern: "/doctor/profile/{doctor_id}"
+    requires_browser: false
+
+    selectors:
+      fields:
+        name:
+          selector: "h2.doctor-name"
+          type: "text"
+        photo_url:
+          selector: "div.doctor-photo img"
+          type: "url"
+          attribute: "src"
+        department:
+          selector: "div.info-row.dept span.value"
+          type: "text"
+        position:
+          selector: "div.info-row.position span.value"
+          type: "text"
+        specialty:
+          selector: "div.specialty-list li"
+          type: "text_list"
+        education:
+          selector: "section.education ul li"
+          type: "text_list"
+        career:
+          selector: "section.career ul li"
+          type: "text_list"
+        certifications:
+          selector: "section.license ul li"
+          type: "text_list"
+        research:
+          selector: "section.research ul li"
+          type: "text_list"
+        publications:
+          selector: "section.publications ul li"
+          type: "text_list"
+        awards:
+          selector: "section.awards ul li"
+          type: "text_list"
+        consultation_schedule:
+          selector: "table.schedule-table"
+          type: "html"
+        phone:
+          selector: "div.contact span.phone"
+          type: "text"
+        email:
+          selector: "div.contact a.email"
+          type: "text"
+
+transforms:
+  - field: "name"
+    operations:
+      - type: "strip"
+      - type: "regex_extract"
+        pattern: "^(.+?)\\s*교수$"
+        group: 1
+
+  - field: "specialty_text"
+    operations:
+      - type: "split"
+        separator: ","
+      - type: "strip"
+
+  - field: "phone"
+    operations:
+      - type: "regex_replace"
+        pattern: "[^0-9-]"
+        replacement: ""
