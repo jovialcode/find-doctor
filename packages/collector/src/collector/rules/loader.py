@@ -120,6 +120,7 @@ class RuleLoader:
             timeout=crawler_data.get("timeout", 30),
             headers=crawler_data.get("headers", {}),
             cookies=crawler_data.get("cookies", {}),
+            ai_extraction_prompt=crawler_data.get("ai_extraction_prompt"),
         )
 
         # Parse targets
@@ -190,6 +191,7 @@ class RuleLoader:
             selectors=selectors,
             pagination=pagination,
             requires_browser=data.get("requires_browser", False),
+            extraction_mode=data.get("extraction_mode", "selector"),
         )
 
     def _parse_transform(self, data: dict[str, Any]) -> TransformConfig:

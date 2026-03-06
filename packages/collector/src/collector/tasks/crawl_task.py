@@ -4,7 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from collector.crawler import BrowserCrawler, CrawlResult, HttpCrawler
+from collector.crawler import AIAgentCrawler, BrowserCrawler, CrawlResult, HttpCrawler
+from core.config.settings import get_settings
 from collector.rules.loader import RuleLoader
 from collector.rules.models import SiteRule, TargetRule
 from collector.storage.local import LocalStorage
@@ -28,7 +29,16 @@ async def _crawl_url(
     """
     crawler_config = site_rule.crawler
 
-    if use_browser or crawler_config.type == "browser":
+    if crawler_config.type == "ai_agent":
+        settings = get_settings()
+        async with AIAgentCrawler(
+            api_key=settings.anthropic_api_key or None,
+            rate_limit=crawler_config.rate_limit,
+            timeout=crawler_config.timeout,
+            extraction_prompt=crawler_config.ai_extraction_prompt,
+        ) as crawler:
+            return await crawler.fetch(url)
+    elif use_browser or crawler_config.type == "browser":
         async with BrowserCrawler(
             rate_limit=crawler_config.rate_limit,
             timeout=crawler_config.timeout,
@@ -61,7 +71,16 @@ async def _crawl_urls(
     """
     crawler_config = site_rule.crawler
 
-    if use_browser or crawler_config.type == "browser":
+    if crawler_config.type == "ai_agent":
+        settings = get_settings()
+        async with AIAgentCrawler(
+            api_key=settings.anthropic_api_key or None,
+            rate_limit=crawler_config.rate_limit,
+            timeout=crawler_config.timeout,
+            extraction_prompt=crawler_config.ai_extraction_prompt,
+        ) as crawler:
+            return await crawler.fetch_many(urls)
+    elif use_browser or crawler_config.type == "browser":
         async with BrowserCrawler(
             rate_limit=crawler_config.rate_limit,
             timeout=crawler_config.timeout,

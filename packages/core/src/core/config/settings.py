@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     crawler_timeout: int = Field(default=30, alias="CRAWLER_TIMEOUT")
     crawler_max_retries: int = Field(default=3, alias="CRAWLER_MAX_RETRIES")
 
+    # Celery settings
+    celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
+    celery_result_backend: str = Field(default="", alias="CELERY_RESULT_BACKEND")
+    worker_concurrency: int = Field(default=4, alias="WORKER_CONCURRENCY")
+
+    # AI Agent settings
+    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @property

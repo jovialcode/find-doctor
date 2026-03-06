@@ -1,4 +1,8 @@
-"""Daily collection DAG for crawling hospital/doctor data."""
+"""Daily collection DAG for crawling hospital/doctor data.
+
+Uses Celery worker pool for distributed task execution instead of
+sequential for-loop processing.
+"""
 
 from datetime import datetime, timedelta
 from typing import Any
@@ -6,9 +10,10 @@ from typing import Any
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.utils.task_group import TaskGroup
 
-# Default arguments for all tasks
+RULES_DIR = "/opt/airflow/rules"
+DATA_DIR = "/opt/airflow/data"
+
 default_args = {
     "owner": "gungil",
     "depends_on_past": False,
@@ -19,111 +24,90 @@ default_args = {
 }
 
 
-def crawl_site_group(site_ids: list[str], **context: Any) -> dict[str, Any]:
-    """Crawl a group of sites.
-
-    Args:
-        site_ids: List of site IDs to crawl
-        context: Airflow context
+def enqueue_crawl_jobs(**context: Any) -> list[str]:
+    """Enqueue crawl tasks for all enabled sites to Celery.
 
     Returns:
-        Crawl results summary
+        List of Celery task IDs
     """
-    from collector.tasks.crawl_task import crawl_site
+    from collector.worker.enqueue import enqueue_all_sites
 
-    results: list[dict[str, Any]] = []
+    task_ids = enqueue_all_sites(
+        rules_dir=RULES_DIR,
+        output_dir=DATA_DIR,
+    )
 
-    for site_id in site_ids:
-        try:
-            result = crawl_site(
-                site_id=site_id,
-                rules_dir="/opt/airflow/rules",
-                output_dir="/opt/airflow/data",
-            )
-            results.append(result)
-        except Exception as e:
-            results.append({
-                "site_id": site_id,
-                "error": str(e),
-            })
-
-    return {
-        "group_size": len(site_ids),
-        "success_count": len([r for r in results if "error" not in r]),
-        "results": results,
-    }
+    context["ti"].xcom_push(key="crawl_task_ids", value=task_ids)
+    return task_ids
 
 
-def parse_all_sites(**context: Any) -> dict[str, Any]:
-    """Parse all crawled data.
-
-    Args:
-        context: Airflow context
+def wait_for_crawl_completion(**context: Any) -> list[dict[str, Any]]:
+    """Wait for all crawl tasks to complete.
 
     Returns:
-        Parse results summary
+        List of task results
     """
-    from collector.tasks.parse_task import parse_all_targets
-    from collector.rules.loader import RuleLoader
+    from collector.worker.enqueue import wait_for_tasks
 
-    loader = RuleLoader("/opt/airflow/rules")
-    rules = loader.load_all_rules()
+    task_ids = context["ti"].xcom_pull(
+        task_ids="enqueue_crawl_jobs",
+        key="crawl_task_ids",
+    )
 
-    results: list[dict[str, Any]] = []
+    if not task_ids:
+        return []
 
-    for rule in rules:
-        if not rule.enabled:
-            continue
-
-        try:
-            result = parse_all_targets(
-                site_id=rule.id,
-                rules_dir="/opt/airflow/rules",
-                input_dir="/opt/airflow/data",
-                output_dir="/opt/airflow/data",
-            )
-            results.append(result)
-        except Exception as e:
-            results.append({
-                "site_id": rule.id,
-                "error": str(e),
-            })
-
-    return {
-        "sites_processed": len(results),
-        "results": results,
-    }
+    return wait_for_tasks(task_ids, timeout=3600)
 
 
-def load_to_storage(**context: Any) -> dict[str, Any]:
-    """Load parsed data to permanent storage.
-
-    Args:
-        context: Airflow context
+def enqueue_parse_jobs(**context: Any) -> list[str]:
+    """Enqueue parse tasks for all enabled sites to Celery.
 
     Returns:
-        Load results summary
+        List of Celery task IDs
     """
-    # TODO: Implement loading to BigQuery/GCS
-    return {"status": "not_implemented"}
+    from collector.worker.enqueue import enqueue_parse_all_sites
+
+    task_ids = enqueue_parse_all_sites(
+        rules_dir=RULES_DIR,
+        input_dir=DATA_DIR,
+        output_dir=DATA_DIR,
+    )
+
+    context["ti"].xcom_push(key="parse_task_ids", value=task_ids)
+    return task_ids
+
+
+def wait_for_parse_completion(**context: Any) -> list[dict[str, Any]]:
+    """Wait for all parse tasks to complete.
+
+    Returns:
+        List of task results
+    """
+    from collector.worker.enqueue import wait_for_tasks
+
+    task_ids = context["ti"].xcom_pull(
+        task_ids="enqueue_parse_jobs",
+        key="parse_task_ids",
+    )
+
+    if not task_ids:
+        return []
+
+    return wait_for_tasks(task_ids, timeout=3600)
 
 
 def send_notifications(**context: Any) -> None:
-    """Send notifications about job completion.
-
-    Args:
-        context: Airflow context
-    """
+    """Send notifications about job completion."""
     # TODO: Implement notification sending (Slack, email, etc.)
     pass
 
 
-# Define the DAG
 with DAG(
     dag_id="daily_collect",
     default_args=default_args,
-    description="Daily collection of hospital and doctor data",
-    schedule="0 2 * * *",  # Run at 02:00 daily
+    description="Daily collection of hospital and doctor data via Celery worker pool",
+    schedule="0 2 * * *",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["collection", "daily"],
@@ -131,41 +115,32 @@ with DAG(
 
     start = EmptyOperator(task_id="start")
 
-    # Site groups for parallel crawling
-    # In production, this would be loaded from configuration
-    site_groups = [
-        ["site_group_0"],  # Sites 0-19
-        ["site_group_1"],  # Sites 20-39
-        # ... more groups
-    ]
-
-    with TaskGroup(group_id="crawl_sites") as crawl_group:
-        crawl_tasks = []
-        for i, group in enumerate(site_groups):
-            task = PythonOperator(
-                task_id=f"crawl_group_{i}",
-                python_callable=crawl_site_group,
-                op_kwargs={"site_ids": group},
-            )
-            crawl_tasks.append(task)
-
-    parse_task = PythonOperator(
-        task_id="parse_all",
-        python_callable=parse_all_sites,
+    enqueue_crawl = PythonOperator(
+        task_id="enqueue_crawl_jobs",
+        python_callable=enqueue_crawl_jobs,
     )
 
-    load_task = PythonOperator(
-        task_id="load_to_storage",
-        python_callable=load_to_storage,
+    wait_crawl = PythonOperator(
+        task_id="wait_for_crawl_completion",
+        python_callable=wait_for_crawl_completion,
+    )
+
+    enqueue_parse = PythonOperator(
+        task_id="enqueue_parse_jobs",
+        python_callable=enqueue_parse_jobs,
+    )
+
+    wait_parse = PythonOperator(
+        task_id="wait_for_parse_completion",
+        python_callable=wait_for_parse_completion,
     )
 
     notify_task = PythonOperator(
         task_id="send_notifications",
         python_callable=send_notifications,
-        trigger_rule="all_done",  # Run even if upstream fails
+        trigger_rule="all_done",
     )
 
     end = EmptyOperator(task_id="end")
 
-    # Define task dependencies
-    start >> crawl_group >> parse_task >> load_task >> notify_task >> end
+    start >> enqueue_crawl >> wait_crawl >> enqueue_parse >> wait_parse >> notify_task >> end

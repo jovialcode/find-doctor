@@ -93,6 +93,7 @@ class TargetRule:
     selectors: SelectorsConfig
     pagination: PaginationConfig | None = None
     requires_browser: bool = False
+    extraction_mode: Literal["selector", "ai"] = "selector"
 
 
 @dataclass(frozen=True)
@@ -107,11 +108,12 @@ class CrawlerConfig:
         cookies: Cookies to include
     """
 
-    type: Literal["http", "browser"] = "http"
+    type: Literal["http", "browser", "ai_agent"] = "http"
     rate_limit: float = 1.0
     timeout: int = 30
     headers: dict[str, str] = field(default_factory=dict)
     cookies: dict[str, str] = field(default_factory=dict)
+    ai_extraction_prompt: str | None = None
 
 
 @dataclass(frozen=True)

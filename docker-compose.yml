@@ -62,6 +62,9 @@ services:
       ENV: development
       DEBUG: "false"
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gungil
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: db+postgresql://postgres:postgres@postgres:5432/gungil
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -70,6 +73,8 @@ services:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -98,6 +103,75 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+    networks:
+      - gungil-network
+
+  # Celery Workers
+  collector-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/collector.Dockerfile
+    container_name: gungil-collector-worker
+    command: celery -A collector.worker.celery_app worker --loglevel=info --concurrency=4 -Q scraper.http,scraper.browser
+    environment:
+      ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gungil
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: db+postgresql://postgres:postgres@postgres:5432/gungil
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: gungil
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gungil-network
+
+  ai-agent-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/collector.Dockerfile
+    container_name: gungil-ai-agent-worker
+    command: celery -A collector.worker.celery_app worker --loglevel=info --concurrency=2 -Q scraper.ai_agent
+    environment:
+      ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gungil
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: db+postgresql://postgres:postgres@postgres:5432/gungil
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: gungil
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gungil-network
+
+  flower:
+    build:
+      context: .
+      dockerfile: infra/docker/collector.Dockerfile
+    container_name: gungil-flower
+    command: celery -A collector.worker.celery_app flower --port=5555
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: db+postgresql://postgres:postgres@postgres:5432/gungil
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/gungil
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
         condition: service_healthy
     networks:
       - gungil-network
