@@ -32,11 +32,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/packages/core/src:/app/packages/client-api/src
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8501
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl --fail http://localhost:8000/health || exit 1
+    CMD curl --fail http://localhost:8501/health || exit 1
 
 # Run the application
-CMD ["uvicorn", "client_api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "client_api.app:app", "--host", "0.0.0.0", "--port", "8501"]

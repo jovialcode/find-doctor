@@ -15,7 +15,7 @@ RULES_DIR = "/opt/airflow/rules"
 DATA_DIR = "/opt/airflow/data"
 
 default_args = {
-    "owner": "gungil",
+    "owner": "find-doctor",
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,

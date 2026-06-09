@@ -2,8 +2,8 @@
 	docker-up docker-down docker-build docker-logs docker-ps
 
 # Default ports
-ADMIN_PORT ?= 8000
-CLIENT_PORT ?= 8001
+ADMIN_PORT ?= 8500
+CLIENT_PORT ?= 8501
 
 help:
 	@echo "Usage: make [target]"

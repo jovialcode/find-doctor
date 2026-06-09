@@ -1,5 +1,5 @@
 [project]
-name = "gungil"
+name = "find-doctor"
 version = "0.1.0"
 description = "Hospital and doctor information collection system"
 requires-python = ">=3.12"

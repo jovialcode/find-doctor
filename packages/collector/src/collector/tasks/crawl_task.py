@@ -4,8 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from collector.config.settings import get_collector_settings
 from collector.crawler import AIAgentCrawler, BrowserCrawler, CrawlResult, HttpCrawler
-from core.config.settings import get_settings
 from collector.rules.loader import RuleLoader
 from collector.rules.models import SiteRule, TargetRule
 from collector.storage.local import LocalStorage
@@ -30,7 +30,7 @@ async def _crawl_url(
     crawler_config = site_rule.crawler
 
     if crawler_config.type == "ai_agent":
-        settings = get_settings()
+        settings = get_collector_settings()
         async with AIAgentCrawler(
             api_key=settings.anthropic_api_key or None,
             rate_limit=crawler_config.rate_limit,
@@ -72,7 +72,7 @@ async def _crawl_urls(
     crawler_config = site_rule.crawler
 
     if crawler_config.type == "ai_agent":
-        settings = get_settings()
+        settings = get_collector_settings()
         async with AIAgentCrawler(
             api_key=settings.anthropic_api_key or None,
             rate_limit=crawler_config.rate_limit,

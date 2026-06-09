@@ -1,7 +1,7 @@
 [project]
 name = "core"
 version = "0.1.0"
-description = "Shared core library for gungil"
+description = "Shared core library for find-doctor"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.5.0",

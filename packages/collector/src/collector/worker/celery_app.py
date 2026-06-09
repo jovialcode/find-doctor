@@ -2,17 +2,19 @@
 
 from celery import Celery
 
+from collector.config.settings import get_collector_settings
 from core.config.settings import get_settings
 
 
 def create_celery_app() -> Celery:
     """Create and configure the Celery application."""
-    settings = get_settings()
+    settings = get_collector_settings()
+    core_settings = get_settings()
 
     app = Celery(
         "collector",
         broker=settings.celery_broker_url,
-        backend=settings.celery_result_backend or settings.database_url,
+        backend=settings.celery_result_backend or core_settings.database_url,
     )
 
     app.conf.update(
